@@ -1,0 +1,38 @@
+BASE_TASK_CONFIG_PATH: "habitat_extensions/config/exploration_gibson.yaml"
+TRAINER_NAME: "occant_exp"
+ENV_NAME: "ExpRLEnv"
+SIMULATOR_GPU_ID: 0
+TORCH_GPU_ID: 1
+VIDEO_OPTION: ["disk", "tensorboard"]
+TENSORBOARD_DIR: "tb"
+VIDEO_DIR: "video_dir"
+TEST_EPISODE_COUNT: 2
+EVAL_CKPT_PATH_DIR: "data/new_checkpoints"
+NUM_PROCESSES: 8
+SENSORS: ["RGB_SENSOR", "DEPTH_SENSOR"]
+CHECKPOINT_FOLDER: "data/new_checkpoints"
+NUM_EPISODES: 20000
+T_EXP: 1000
+LOG_INTERVAL: 100
+CHECKPOINT_INTERVAL: 500
+
+RL:
+  PPO:
+    # ppo params
+    clip_param: 0.2
+    ppo_epoch: 4
+    num_mini_batch: 1
+    value_loss_coef: 0.5
+    entropy_coef: 0.01
+    lr: 2.5e-4
+    eps: 1e-5
+    max_grad_norm: 0.5
+    use_gae: True
+    gamma: 0.99
+    tau: 0.95
+    use_linear_lr_decay: False
+    reward_window_size: 50
+
+  ANS:
+    MAPPER:
+      pose_loss_coef: 0.3

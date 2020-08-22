@@ -1,0 +1,32 @@
+BASE_TASK_CONFIG_PATH: "configs/exploration/gibson_evaluate_noisy.yaml"
+TRAINER_NAME: "occant_exp"
+ENV_NAME: "ExpRLEnv"
+SIMULATOR_GPU_ID: 0
+SIMULATOR_GPU_IDS: [0]
+TORCH_GPU_ID: 0
+VIDEO_OPTION: []
+TENSORBOARD_DIR: "eval_tb"
+VIDEO_DIR: "video_dir"
+EVAL_CKPT_PATH_DIR: "data/new_checkpoints"
+NUM_PROCESSES: 1
+SENSORS: ["RGB_SENSOR", "DEPTH_SENSOR"]
+CHECKPOINT_FOLDER: "data/new_checkpoints"
+NUM_EPISODES: 10000
+T_EXP: 1000
+
+EVAL:
+  USE_CKPT_CONFIG: False
+
+RL:
+  ANS:
+    goal_success_radius: 0.2 # 2 x agent radius
+    planning_step: 0.50
+    image_scale_hw: [128, 128]
+    MAPPER:
+      map_size: 65
+      registration_type: "moving_average"
+      ignore_pose_estimator: False
+      use_data_parallel: True
+      gpu_ids: [0]
+    OCCUPANCY_ANTICIPATOR:
+      type: "occant_depth"

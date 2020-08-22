@@ -1,0 +1,37 @@
+ENVIRONMENT:
+  MAX_EPISODE_STEPS: 1000
+  ITERATOR_OPTIONS:
+    SHUFFLE: False
+SIMULATOR:
+  AGENT_0:
+    SENSORS: ['RGB_SENSOR', 'DEPTH_SENSOR']
+  HABITAT_SIM_V0:
+    GPU_DEVICE_ID: 0
+  RGB_SENSOR:
+    WIDTH: 128
+    HEIGHT: 128
+    HFOV: 90
+  DEPTH_SENSOR:
+    WIDTH: 128
+    HEIGHT: 128
+    HFOV: 90
+    MIN_DEPTH: 0.0
+    MAX_DEPTH: 10.0
+  ACTION_SPACE_CONFIG: "pyrobotnoisy"
+  NOISE_MODEL:
+    ROBOT: 'LoCoBot'
+    CONTROLLER: 'ILQR'
+    NOISE_MULTIPLIER: 1.0
+TASK:
+  TYPE: Exp-v0
+  POSSIBLE_ACTIONS: ["MOVE_FORWARD", "TURN_LEFT", "TURN_RIGHT"]
+  SENSORS: ['NOISY_POSE_SENSOR', 'GT_POSE_SENSOR', 'COLLISION_SENSOR']
+  MEASUREMENTS: ['GT_GLOBAL_MAP']
+  GT_GLOBAL_MAP:
+    MAP_SIZE: 961
+    MAP_SCALE: 0.05
+    ENVIRONMENT_LAYOUTS_PATH: 'data/datasets/exploration/gibson/v1/val/environment_layouts'
+DATASET:
+  TYPE: Exploration-v1
+  SPLIT: val
+  DATA_PATH: data/datasets/exploration/gibson/v1/{split}/{split}.json.gz

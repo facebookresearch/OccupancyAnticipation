@@ -1,0 +1,31 @@
+BASE_TASK_CONFIG_PATH: "configs/navigation/gibson_evaluate_noisy.yaml"
+TRAINER_NAME: "occant_nav"
+ENV_NAME: "NavRLEnv"
+SIMULATOR_GPU_ID: 0
+SIMULATOR_GPU_IDS: [0]
+TORCH_GPU_ID: 0
+TENSORBOARD_DIR: "eval_tb"
+TEST_EPISODE_COUNT: -1
+EVAL_CKPT_PATH_DIR: "data/new_checkpoints"
+NUM_PROCESSES: 1
+SENSORS: ["RGB_SENSOR", "DEPTH_SENSOR"]
+CHECKPOINT_FOLDER: "data/new_checkpoints"
+T_MAX: 500
+
+EVAL:
+  USE_CKPT_CONFIG: False
+
+RL:
+  ANS:
+    goal_success_radius: 0.2 # 2 x agent radius
+    planning_step: 0.50
+    image_scale_hw: [128, 128]
+    crop_map_for_planning: False
+    MAPPER:
+      map_size: 65
+      registration_type: "moving_average"
+      ignore_pose_estimator: False
+      use_data_parallel: True
+      gpu_ids: [0]
+    OCCUPANCY_ANTICIPATOR:
+      type: "occant_depth"
