@@ -183,7 +183,7 @@ We also provide a habitat challenge version of our model with the navigation res
 
 | Model name      | Training data |       Val SPL      |    Test Std. SPL   | Checkpoint URL |  Eval config URL |
 |-----------------|:-------------:|:------------------:|:------------------:|:--------------:|:----------------:|
-| OccAnt(depth)   |   Gibson 2+   |       0.463        |       0.190        | [ckpt.13.pth](https://dl.fbaipublicfiles.com/OccupancyAnticipation/pretrained_models/occant_depth_ch/ckpt.13.pth) | [ppo_exploration.yaml](https://dl.fbaipublicfiles.com/OccupancyAnticipation/pretrained_models/occant_depth/ppo_exploration.yaml) |
+| OccAnt(depth)   |   Gibson 2+   |       0.463        |       0.190        | [ckpt.13.pth](https://dl.fbaipublicfiles.com/OccupancyAnticipation/pretrained_models/occant_depth_ch/ckpt.13.pth) | [ppo_exploration.yaml](https://dl.fbaipublicfiles.com/OccupancyAnticipation/pretrained_models/occant_depth_ch/ppo_navigation_evaluate.yaml) |
 
 
 ## Replicating ECCV results
@@ -200,13 +200,13 @@ Checkout the `eccv_2020_eval` branch for the evaluation code. The pretrained mod
 | OccAnt(rgbd)    |    Gibson 4+  |      0.782      | [ckpt.7.pth](https://dl.fbaipublicfiles.com/OccupancyAnticipation/pretrained_models_eccv_2020/pretrained_models/occant_rgbd/ckpt.7.pth) | [ppo_navigation\_evaluate.yaml](https://dl.fbaipublicfiles.com/OccupancyAnticipation/pretrained_models_eccv_2020/pretrained_models/occant_rgbd/ppo_navigation_evaluate.yaml) |
 
 ## Acknowledgements
-This repository uses parts of [Habitat Lab](https://github.com/facebookresearch/habitat-lab) and extends it. We also used [Neural SLAM](https://github.com/devendrachaplot/Neural-SLAM) as a reference for the planning heuristics. We thank Devendra Singh Chaplot for helping replicate the Active Neural SLAM results during the early stages of the project. 
+This repository uses parts of [Habitat Lab](https://github.com/facebookresearch/habitat-lab) and extends it. We also used [Neural SLAM](https://github.com/devendrachaplot/Neural-SLAM) as a reference for the planning heuristics. We thank Devendra Singh Chaplot for helping replicate the Active Neural SLAM results during the early stages of the project.
 
 ## Citation
 ```
 @inproceedings{ramakrishnan2020occant,
   title={Occupancy Anticipation for Efficient Exploration and Navigation},
-  author={Santhosh Kumar Ramarkishnan, Ziad Al-Halah and Kristen Grauman},
+  author={Santhosh Kumar Ramakrishnan, Ziad Al-Halah and Kristen Grauman},
   booktitle={Proceedings of the European Conference on Computer Vision (ECCV)},
   year={2020}
 }
