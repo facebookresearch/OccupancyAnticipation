@@ -33,6 +33,7 @@ from occant_baselines.rl.policy_utils import (
     PoseEstimator,
 )
 from einops import rearrange
+from einops.layers.torch import Rearrange
 
 
 EPS_MAPPER = 1e-8
@@ -238,17 +239,25 @@ class Mapper(nn.Module):
         self.img_std_t = rearrange(
             torch.Tensor(self.config.NORMALIZATION.img_std), "c -> () c () ()"
         )
-        self.pose_estimator = PoseEstimator(
-            V,
-            self.config.pose_predictor_inputs,
-            n_pose_layers=self.config.n_pose_layers,
-            n_ensemble_layers=self.config.n_ensemble_layers,
-            input_shape=self.config.image_scale_hw,
-        )
         self.projection_unit = projection_unit
+        self.pose_estimation_unit_part_1 = nn.Sequential(  # (4, V, V)
+            nn.Conv2d(4, 2, 3, stride=1, padding=1),  # (2, V, V)
+            nn.ReLU(),
+            nn.Conv2d(2, 2, 5, stride=1, padding=2),  # (2, V, V)
+            nn.ReLU(),
+            nn.Conv2d(2, 1, 5, stride=1, padding=2),  # (1, V, V)
+            nn.ReLU(),
+            Rearrange("b c h w -> b (c h w)"),
+        )
+        self.pose_estimation_unit_part_2 = nn.Sequential(
+            nn.Linear(V * V, 32), nn.LeakyReLU(0.2), nn.Linear(32, 3),
+        )
         if self.config.freeze_projection_unit:
             for p in self.projection_unit.parameters():
                 p.requires_grad = False
+
+        if self.config.use_data_parallel:
+            self.projection_unit = nn.DataParallel(self.projection_unit)
 
         # Cache to store pre-computed information
         self._cache = {}
@@ -326,7 +335,11 @@ class Mapper(nn.Module):
                 for k in pose_inputs.keys():
                     pose_inputs[k] = pose_inputs[k].detach()
             n_pose_inputs = self._transform_observations(pose_inputs, dx)
-            pose_outputs = self.pose_estimator(n_pose_inputs)
+            pose_map_inputs = torch.cat(
+                [n_pose_inputs["ego_map_t_1"], n_pose_inputs["ego_map_t"]], 1
+            )
+            pose_features = self.pose_estimation_unit_part_1(pose_map_inputs)
+            pose_outputs = {"pose": self.pose_estimation_unit_part_2(pose_features)}
             dx_hat = add_pose(dx, pose_outputs["pose"])
             all_pose_outputs["pose_outputs"] = pose_outputs
             # Estimate global pose
