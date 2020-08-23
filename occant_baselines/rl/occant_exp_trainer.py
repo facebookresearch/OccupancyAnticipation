@@ -1096,8 +1096,8 @@ class OccAntExpTrainer(BaseRLTrainer):
         )
         # Sanity checks
         assert (
-            NUM_MAPPER_STEPS % NUM_GLOBAL_STEPS == 0
-        ), "Mapper steps must be a multiple of global steps"
+            NUM_MAPPER_STEPS % NUM_LOCAL_STEPS == 0
+        ), "Mapper steps must be a multiple of global steps interval"
         assert (
             NUM_LOCAL_STEPS == ans_cfg.goal_interval
         ), "Local steps must be same as subgoal sampling interval"
