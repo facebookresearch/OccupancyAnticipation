@@ -1805,7 +1805,7 @@ class OccAntExpTrainer(BaseRLTrainer):
                 per_episode_metrics["pose_estimation/" + k] = v.metric_list
 
             per_episode_statistics = []
-            for i in range(num_eval_episodes):
+            for i in range(number_of_eval_episodes):
                 stats = {}
                 for k, v in per_episode_metrics.items():
                     stats[k] = {}
