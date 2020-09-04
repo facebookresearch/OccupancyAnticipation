@@ -139,14 +139,14 @@ Note that the Matterport3D test set generation may take ~ 3 hours.
 ## Training models
 We provide the training code for the following baselines and variants of our models:
 
-| Model         | Config directory              |
-|---------------|-------------------------------|
-| ANS(rgb)      | `configs/ans_rgb`             |
-| ANS(depth)    | `configs/ans_depth`           |
-| OccAnt(rgb)   | `configs/occant_rgb`          |
-| OccAnt(depth) | `configs/occant_depth`        |
-| OccAnt(rgbd)  | `configs/occant_rgbd`         |
-| OccAnt(GT)    | `configs/occant_ground_truth` |
+| Model         | Config directory                            |
+|---------------|---------------------------------------------|
+| ANS(rgb)      | `configs/model_configs/ans_rgb`             |
+| ANS(depth)    | `configs/model_configs/ans_depth`           |
+| OccAnt(rgb)   | `configs/model_configs/occant_rgb`          |
+| OccAnt(depth) | `configs/model_configs/occant_depth`        |
+| OccAnt(rgbd)  | `configs/model_configs/occant_rgbd`         |
+| OccAnt(GT)    | `configs/model_configs/occant_ground_truth` |
 
 To train a model, run the following:
 
@@ -189,7 +189,7 @@ We also provide a habitat challenge version of our model with the navigation res
 
 | Model name      | Training data |       Val SPL      |    Test Std. SPL   | Checkpoint URL |  Eval config URL |
 |-----------------|:-------------:|:------------------:|:------------------:|:--------------:|:----------------:|
-| OccAnt(depth)   |   Gibson 2+   |       0.463        |       0.190        | [ckpt.13.pth](https://dl.fbaipublicfiles.com/OccupancyAnticipation/pretrained_models/occant_depth_ch/ckpt.13.pth) | [ppo_exploration.yaml](https://dl.fbaipublicfiles.com/OccupancyAnticipation/pretrained_models/occant_depth_ch/ppo_navigation_evaluate.yaml) |
+| OccAnt(depth)   |   Gibson 2+   |       0.463        |       0.190        | [ckpt.13.pth](https://dl.fbaipublicfiles.com/OccupancyAnticipation/pretrained_models/occant_depth_ch/ckpt.13.pth) | [ppo_navigation_evaluate.yaml](https://dl.fbaipublicfiles.com/OccupancyAnticipation/pretrained_models/occant_depth_ch/ppo_navigation_evaluate.yaml) |
 
 
 ## Replicating ECCV results
