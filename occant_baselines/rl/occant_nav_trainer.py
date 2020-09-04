@@ -472,7 +472,7 @@ class OccAntNavTrainer(BaseRLTrainer):
 
         if checkpoint_index == 0:
             try:
-                checkpoint_index = self.config.EVAL_CKPT_PATH_DIR.split("/")[-1].split(
+                eval_ckpt_idx = self.config.EVAL_CKPT_PATH_DIR.split("/")[-1].split(
                     "."
                 )[1]
                 logger.add_filehandler(
