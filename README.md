@@ -48,6 +48,12 @@ Install other requirements for this repository.
 cd $OCCANT_ROOT_DIR
 pip install -r requirements.txt
 ```
+
+Add the OccupancyAnticipation directory to `PYTHONPATH` in `.bashrc`.
+
+```
+export PYTHONPATH=<path to OccupancyAnticipation>:$PYTHONPATH
+```
 Create a symlink to the habitat-api data directory.
 
 ```
