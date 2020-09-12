@@ -58,7 +58,7 @@ Create a symlink to the habitat-api data directory.
 
 ```
 cd $OCCANT_ROOT_DIR
-ls -s <PATH TO habitat-api/data> data
+ln -s <PATH TO habitat-api/data> data
 ```
 Download the exploration dataset.
 
