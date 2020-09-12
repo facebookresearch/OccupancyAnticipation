@@ -38,7 +38,7 @@ TASK:
   GT_GLOBAL_MAP:
     MAP_SIZE: 961
     MAP_SCALE: 0.05
-    ENVIRONMENT_LAYOUTS_PATH: 'data/datasets/exploration/gibson/v1/train/environment_layouts'
+    ENVIRONMENT_LAYOUTS_PATH: ''
 DATASET:
   TYPE: Exploration-v1
   SPLIT: train

@@ -370,7 +370,10 @@ class OccAntExpTrainer(BaseRLTrainer):
             )["area_seen"]
         else:
             global_reward_metric = measure_anticipation_reward(
-                mapper_outputs["mt"], ground_truth_states["environment_layout"]
+                mapper_outputs["mt"],
+                ground_truth_states["environment_layout"],
+                reduction="none",
+                apply_mask="True",
             )
         return global_reward_metric.unsqueeze(1)
 
