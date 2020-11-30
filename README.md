@@ -36,7 +36,7 @@ python setup.py develop --all
 	
 # Install habitat-sim
 cd $OCCANT_ROOT_DIR/environments/habitat/habitat-sim
-python setup.py install --headles --with-cuda
+python setup.py install --headless --with-cuda
 	
 # Install astar_pycpp
 cd $OCCANT_ROOT_DIR/occant_utils/astar_pycpp
