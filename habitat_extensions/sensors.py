@@ -177,7 +177,7 @@ class NoisyPoseSensor(Sensor):
             current_agent_position,
             current_agent_rotation,
         )
-        delta_y_gt = current_agent_position[1] - past_agent_position[0]
+        delta_y_gt = current_agent_position[1] - past_agent_position[1]
 
         # Add noise to D_rho, D_theta
         D_rho, D_phi, D_theta = delta_xz_gt
@@ -1077,7 +1077,7 @@ class NoisyIntegratedPointGoalGPSAndCompassSensor(PointGoalSensor):
             current_agent_position,
             current_agent_rotation,
         )
-        delta_y_gt = current_agent_position[1] - past_agent_position[0]
+        delta_y_gt = current_agent_position[1] - past_agent_position[1]
 
         # Add noise to D_rho, D_theta
         D_rho, D_phi, D_theta = delta_xz_gt
