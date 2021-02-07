@@ -338,7 +338,7 @@ class OccAntExpTrainer(BaseRLTrainer):
             "ego_map_gt_anticipated_at_t": batch["ego_map_gt_anticipated"],
             "action_at_t_1": batch["prev_actions"],
         }
-        if ans_cfg.OCCUPANCY_ANTICIPATOR.type == "baseline_gt_anticipation":
+        if ans_cfg.OCCUPANCY_ANTICIPATOR.type == "occant_ground_truth":
             mapper_rollout_inputs["ego_map_gt_anticipated_at_t_1"] = prev_batch[
                 "ego_map_gt_anticipated"
             ]
@@ -806,7 +806,7 @@ class OccAntExpTrainer(BaseRLTrainer):
             ],
             "action_at_t_1": spaces.Box(low=0, high=4, shape=(1,), dtype=np.int32),
         }
-        if ans_cfg.OCCUPANCY_ANTICIPATOR.type == "baseline_gt_anticipation":
+        if ans_cfg.OCCUPANCY_ANTICIPATOR.type == "occant_ground_truth":
             mapper_observation_space[
                 "ego_map_gt_anticipated_at_t_1"
             ] = self.envs.observation_spaces[0].spaces["ego_map_gt_anticipated"]
