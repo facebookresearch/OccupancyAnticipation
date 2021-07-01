@@ -150,6 +150,11 @@ class OccAntExpTrainer(BaseRLTrainer):
             config.TASK_CONFIG.TASK.GT_GLOBAL_MAP.MAP_SCALE = (
                 config.RL.ANS.MAPPER.map_scale
             )
+        # Enable GT anticipation sensor for baseline evaluation
+        if config.RL.ANS.OCCUPANCY_ANTICIPATOR.type == "occant_ground_truth":
+            if 'GT_EGO_MAP_ANTICIPATED' not in config.TASK_CONFIG.TASK.SENSORS:
+                config.TASK_CONFIG.TASK.SENSORS.append('GT_EGO_MAP_ANTICIPATED')
+
         config.freeze()
 
     def _setup_actor_critic_agent(self, ppo_cfg: Config, ans_cfg: Config) -> None:
