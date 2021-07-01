@@ -95,6 +95,12 @@ class OccAntNavTrainer(BaseRLTrainer):
         ego_proj_config.camera_height = camera_height
         ego_proj_config.height_thresholds = height_thresholds
         config.RL.ANS.OCCUPANCY_ANTICIPATOR.EGO_PROJECTION = ego_proj_config
+        # Set the GT anticipation options
+        wall_fov = config.RL.ANS.OCCUPANCY_ANTICIPATOR.GP_ANTICIPATION.wall_fov
+        config.TASK_CONFIG.TASK.GT_EGO_MAP_ANTICIPATED.WALL_FOV = wall_fov
+        config.TASK_CONFIG.TASK.GT_EGO_MAP_ANTICIPATED.MAP_SIZE = map_size
+        config.TASK_CONFIG.TASK.GT_EGO_MAP_ANTICIPATED.MAP_SCALE = map_scale
+        config.TASK_CONFIG.TASK.GT_EGO_MAP_ANTICIPATED.MAX_SENSOR_RANGE = -1
         # Set the correct image scaling values
         config.RL.ANS.MAPPER.image_scale_hw = config.RL.ANS.image_scale_hw
         config.RL.ANS.LOCAL_POLICY.image_scale_hw = config.RL.ANS.image_scale_hw
@@ -105,6 +111,11 @@ class OccAntNavTrainer(BaseRLTrainer):
         config.RL.ANS.LOCAL_POLICY.AGENT_DYNAMICS.turn_angle = (
             config.TASK_CONFIG.SIMULATOR.TURN_ANGLE
         )
+        # Enable GT anticipation sensor for baseline evaluation
+        if config.RL.ANS.OCCUPANCY_ANTICIPATOR.type == "occant_ground_truth":
+            if 'GT_EGO_MAP_ANTICIPATED' not in config.TASK_CONFIG.TASK.SENSORS:
+                config.TASK_CONFIG.TASK.SENSORS.append('GT_EGO_MAP_ANTICIPATED')
+
         config.freeze()
 
     def _setup_actor_critic_agent(self, ppo_cfg: Config, ans_cfg: Config) -> None:
