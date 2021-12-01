@@ -387,6 +387,7 @@ class OccAntNavTrainer(BaseRLTrainer):
             for ep_step in range(self.config.T_MAX):
                 step_start_time = time.time()
                 # ============================ Action step ============================
+                print(f"|DEBUG| having {observations[0]['rgb'].shape} observations in a batch")
                 batch = self._prepare_batch(observations)
                 if self.prev_batch is None:
                     self.prev_batch = copy.deepcopy(batch)

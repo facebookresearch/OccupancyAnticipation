@@ -402,8 +402,11 @@ class CNNBase(NNBase):
         return embedding_size
 
     def forward(self, inputs, rnn_hxs, masks):
+        
         x_rgb = inputs["rgb_at_t"]
+        print(f'|DEBUG 4| rgb_at_t={x_rgb}')
         x_rgb = process_image(x_rgb, self.img_mean, self.img_std)
+        print(f'|DEBUG 5| rgb_at_t after processing={x_rgb}')
         x_goal = inputs["goal_at_t"]
         x_time = inputs["t"].squeeze(1)
 

@@ -170,6 +170,8 @@ class LocalPolicy(nn.Module):
         raise NotImplementedError
 
     def act(self, inputs, rnn_hxs, prev_actions, masks, deterministic=False):
+        print(f'|DEBUG2| self.base={self.base}, inputs.shape={inputs.keys()}')
+        print(f'|DEBUG3| inputs["rgb_at_t"].shape=f{inputs["rgb_at_t"].shape}')
         value, actor_features, rnn_hxs = self.base(inputs, rnn_hxs, masks)
         dist = self.dist(actor_features)
 
