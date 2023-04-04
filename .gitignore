@@ -91,3 +91,4 @@ data
 # exclude trained_models from source control by default
 trained_models
 pretrained_models
+experiments

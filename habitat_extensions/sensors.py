@@ -38,6 +38,8 @@ from occant_utils.common import (
     grow_projected_map,
     spatial_transform_map,
 )
+import occant_utils.home_robot.depth as du
+
 
 cv2 = try_cv2_import()
 
@@ -310,6 +312,186 @@ class NoiseFreePoseSensor(Sensor):
 
 @registry.register_sensor(name="GTEgoMap")
 class GTEgoMap(Sensor):
+    r"""Estimates the top-down occupancy based on current depth-map.
+
+    Args:
+        sim: reference to the simulator for calculating task observations.
+        config: contains the MAP_SCALE, MAP_SIZE, HEIGHT_THRESH fields to
+                decide grid-size, extents of the projection, and the thresholds
+                for determining obstacles and explored space.
+    """
+
+    def __init__(self, sim: Simulator, config: Config, *args: Any, **kwargs: Any):
+        self._sim = sim
+
+        super().__init__(config=config)
+
+        self.screen_h = self._sim.habitat_config.DEPTH_SENSOR.HEIGHT
+        self.screen_w = self._sim.habitat_config.DEPTH_SENSOR.WIDTH
+        self.camera_matrix = du.get_camera_matrix(
+            self.screen_w, self.screen_h, self._sim.habitat_config.DEPTH_SENSOR.HFOV
+        )
+        self.resolution = self.config.MAP_SCALE * 100.0 # in centimeters
+        self.xy_resolution = self.z_resolution = self.resolution
+        self.vision_range = self.config.MAP_SIZE
+        self.exp_pred_threshold = 1.0
+        self.map_pred_threshold = 1.0
+        self.max_depth = 3.5 * 100.0
+        self.min_depth = 0.5 * 100.0
+        self.agent_height = self._sim.habitat_config.DEPTH_SENSOR.POSITION[1] * 100.0
+        # Height thresholds for obstacles
+        self.height_thresh = self.config.HEIGHT_THRESH
+        self.max_voxel_height = int(360 / self.z_resolution)
+        self.min_voxel_height = int(-40 / self.z_resolution)
+        self.min_mapped_height = int(
+            25 / self.z_resolution - self.min_voxel_height
+        )
+        self.max_mapped_height = int(
+            (self.agent_height + 1) / self.z_resolution - self.min_voxel_height
+        )
+        self.du_scale = 1
+        self.shift_loc = [self.vision_range * self.xy_resolution // 2, 0, np.pi / 2.0]
+        self.tilt_angle = self._sim.habitat_config.DEPTH_SENSOR.ORIENTATION[0]  # in radians
+
+        # Depth processing
+        self.src_min_depth = float(self._sim.habitat_config.DEPTH_SENSOR.MIN_DEPTH) * 100.0
+        self.src_max_depth = float(self._sim.habitat_config.DEPTH_SENSOR.MAX_DEPTH) * 100.0
+        self.src_normalized_depth = self._sim.habitat_config.DEPTH_SENSOR.NORMALIZE_DEPTH
+
+    def _get_uuid(self, *args: Any, **kwargs: Any):
+        return "ego_map_gt"
+
+    def _get_sensor_type(self, *args: Any, **kwargs: Any):
+        return SensorTypes.COLOR
+
+    def _get_observation_space(self, *args: Any, **kwargs: Any):
+        sensor_shape = (self.config.MAP_SIZE, self.config.MAP_SIZE, 2)
+        return spaces.Box(low=0, high=1, shape=sensor_shape, dtype=np.uint8,)
+
+    def _get_depth_projection(self, rgb_map: torch.Tensor, depth_map: torch.Tensor):
+        """Generate a local map given a new observation using parameter-free
+        differentiable projective geometry.
+        Args:
+            depth_map: current frame containing depth (batch_size, frame_height, frame_width)
+        Returns:
+            local_map: current local map updated with current observation of shape
+                (batch_size, 2, map_height, map_width)
+        """
+        batch_size, h, w = depth_map.size()
+        device, dtype = depth_map.device, depth_map.dtype
+        tilt = torch.ones(batch_size).to(device) * self.tilt_angle
+
+        depth = depth_map.float()
+        if self.src_normalized_depth:
+            depth = depth * (self.src_max_depth - self.src_min_depth) + self.src_min_depth
+        else:
+            # convert to cm
+            depth = depth * 100.0
+        depth[depth > self.max_depth] = 0
+        depth[depth == self.min_depth] = 0
+        point_cloud_t = du.get_point_cloud_from_z_t(
+            depth, self.camera_matrix, device, scale=self.du_scale
+        )
+        point_cloud_base_coords = du.transform_camera_view_t(
+            point_cloud_t, self.agent_height, (tilt * 180.0 / math.pi).numpy(), device
+        )
+        point_cloud_map_coords = du.transform_pose_t(
+            point_cloud_base_coords, self.shift_loc, device
+        )
+        if False:
+            # from occant_utils.home_robot.point_cloud import show_point_cloud
+
+            rgb = rgb_map[:, :3, :: self.du_scale, :: self.du_scale].permute(0, 2, 3, 1)
+            xyz = point_cloud_map_coords[0].reshape(-1, 3).numpy()
+            rgb = rgb[0].reshape(-1, 3).numpy()
+            print("-> Showing point cloud in camera coords")
+            # show_point_cloud(
+            #     (xyz / 100.0) (rgb / 255.0), orig=np.zeros(3)
+            # )
+            import matplotlib.pyplot as plt
+            import matplotlib
+            matplotlib.use("agg")
+            fig = plt.figure()
+            plt.scatter(xyz[:, 0], xyz[:, 1], c=rgb / 255.0)
+            plt.savefig("image_1.png")
+            fig = plt.figure()
+            plt.scatter(xyz[:, 0], xyz[:, 2], c=rgb / 255.0)
+            plt.savefig("image_2.png")
+            fig = plt.figure()
+            plt.imshow(rgb.reshape(h, w, 3) / 255.0)
+            plt.savefig("image_3.png")
+
+        voxel_channels = 1
+
+        init_grid = torch.zeros(
+            batch_size,
+            voxel_channels,
+            self.vision_range,
+            self.vision_range,
+            self.max_voxel_height - self.min_voxel_height,
+            device=device,
+            dtype=torch.float32,
+        )
+        feat = torch.ones(
+            batch_size,
+            voxel_channels,
+            self.screen_h // self.du_scale * self.screen_w // self.du_scale,
+            device=device,
+            dtype=torch.float32,
+        )
+
+        XYZ_cm_std = point_cloud_map_coords.float()
+        XYZ_cm_std[..., :2] = XYZ_cm_std[..., :2] / self.xy_resolution
+        XYZ_cm_std[..., :2] = (
+            (XYZ_cm_std[..., :2] - self.vision_range // 2.0) / self.vision_range * 2.0
+        )
+        XYZ_cm_std[..., 2] = XYZ_cm_std[..., 2] / self.z_resolution
+        XYZ_cm_std[..., 2] = (
+            (
+                XYZ_cm_std[..., 2]
+                - (self.max_voxel_height + self.min_voxel_height) // 2.0
+            )
+            / (self.max_voxel_height - self.min_voxel_height)
+            * 2.0
+        )
+        XYZ_cm_std = XYZ_cm_std.permute(0, 3, 1, 2)
+        XYZ_cm_std = XYZ_cm_std.view(
+            XYZ_cm_std.shape[0],
+            XYZ_cm_std.shape[1],
+            XYZ_cm_std.shape[2] * XYZ_cm_std.shape[3],
+        )
+
+        voxels = du.splat_feat_nd(init_grid, feat, XYZ_cm_std).transpose(2, 3)
+
+        agent_height_proj = voxels[
+            ..., self.min_mapped_height : self.max_mapped_height
+        ].sum(4)
+        # all_height_proj = voxels.sum(4)
+        all_height_proj = voxels[..., 0 : self.max_mapped_height].sum(4)
+
+        fp_map_pred = agent_height_proj[:, 0:1, :, :]
+        fp_exp_pred = all_height_proj[:, 0:1, :, :]
+        fp_map_pred = ((fp_map_pred / self.map_pred_threshold) >= 1.0).float()
+        fp_exp_pred = ((fp_exp_pred / self.exp_pred_threshold) >= 1.0).float()
+        output = torch.cat([fp_map_pred, fp_exp_pred], dim=1)  # (B, 2, H, W)
+        # Post-hoc transformations to fix coordinate system
+        output = torch.flip(output, [2])
+
+        return output
+
+    def get_observation(self, *args: Any, observations, episode, **kwargs: Any):
+        sim_depth = asnumpy(observations["depth"])  # (H, W, 1)
+        sim_rgb = asnumpy(observations["rgb"])  # (H, W, 3)
+        sim_depth = torch.from_numpy(sim_depth).squeeze(2).unsqueeze(0)  # (1, H, W)
+        sim_rgb = torch.from_numpy(sim_rgb).permute(2, 0, 1).unsqueeze(0)  # (1, 3, H, W)
+        ego_map_gt = self._get_depth_projection(sim_rgb, sim_depth)  # (1, 2, H, W)
+        ego_map_gt = rearrange(ego_map_gt, "() c h w -> h w c")
+
+        return ego_map_gt
+
+
+@registry.register_sensor(name="GTEgoMapOld")
+class GTEgoMapOld(Sensor):
     r"""Estimates the top-down occupancy based on current depth-map.
 
     Args:

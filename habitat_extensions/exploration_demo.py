@@ -45,8 +45,8 @@ def colorize_ego_map(ego_map):
               d 2nd channel represents prob(explored space)
     """
     explored_mask = ego_map[..., 1] > 0.5
-    occupied_mask = np.logical_and(ego_map[..., 0] > 0.5, explored_mask)
-    free_space_mask = np.logical_and(ego_map[..., 0] <= 0.5, explored_mask)
+    occupied_mask = (ego_map[..., 0] > 0.5) & explored_mask
+    free_space_mask = (ego_map[..., 0] <= 0.5) & explored_mask
     unexplored_mask = ego_map[..., 1] <= 0.5
 
     ego_map_color = np.zeros((*ego_map.shape[:2], 3), np.uint8)
