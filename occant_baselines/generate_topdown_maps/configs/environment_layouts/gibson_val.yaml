@@ -5,14 +5,23 @@ ENVIRONMENT:
 SIMULATOR:
   AGENT_0:
     SENSORS: ['RGB_SENSOR', 'DEPTH_SENSOR']
+    HEIGHT: 1.41  # From https://hello-robot.com/product
+    RADIUS: 0.17  # From https://hello-robot.com/product
   HABITAT_SIM_V0:
     GPU_DEVICE_ID: 0
   RGB_SENSOR:
-    WIDTH: 128
-    HEIGHT: 128
+    WIDTH: 480              # From https://arxiv.org/pdf/2109.10892.pdf
+    HEIGHT: 640             # From https://arxiv.org/pdf/2109.10892.pdf
+    HFOV: 42                # From https://www.intelrealsense.com/depth-camera-d435
+    POSITION: [0, 1.31, 0]  # From https://arxiv.org/pdf/2109.10892.pdf
   DEPTH_SENSOR:
-    WIDTH: 128
-    HEIGHT: 128
+    WIDTH: 480              # From https://arxiv.org/pdf/2109.10892.pdf
+    HEIGHT: 640             # From https://arxiv.org/pdf/2109.10892.pdf
+    HFOV: 42                # From https://www.intelrealsense.com/depth-camera-d435
+    MIN_DEPTH: 0.5
+    MAX_DEPTH: 5.0
+    POSITION: [0, 1.31, 0]  # From https://arxiv.org/pdf/2109.10892.pdf
+    ORIENTATION: [-0.5235, 0.0, 0.0]
 TASK:
   TYPE: Exp-v0
   SENSORS: ['GT_POSE_SENSOR', 'GT_EGO_MAP']
