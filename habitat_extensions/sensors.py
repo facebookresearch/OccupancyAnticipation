@@ -488,8 +488,8 @@ class GTEgoMap(Sensor):
         return ego_map_gt
 
 
-@registry.register_sensor(name="GTEgoMapOld")
-class GTEgoMapOld(Sensor):
+@registry.register_sensor(name="GTEgoWallMap")
+class GTEgoWallMap(GTEgoMap):
     r"""Estimates the top-down occupancy based on current depth-map.
 
     Args:
@@ -500,345 +500,18 @@ class GTEgoMapOld(Sensor):
     """
 
     def __init__(self, sim: Simulator, config: Config, *args: Any, **kwargs: Any):
-        self._sim = sim
-
-        super().__init__(config=config)
-
-        # Map statistics
-        self.map_size = self.config.MAP_SIZE
-        self.map_scale = self.config.MAP_SCALE
-        if self.config.MAX_SENSOR_RANGE > 0:
-            self.max_forward_range = self.config.MAX_SENSOR_RANGE
-        else:
-            self.max_forward_range = self.map_size * self.map_scale
-
-        # Agent height for pointcloud tranforms
-        self.camera_height = self._sim.habitat_config.DEPTH_SENSOR.POSITION[1]
-
-        # Compute intrinsic matrix
-        depth_H = self._sim.habitat_config.DEPTH_SENSOR.HEIGHT
-        depth_W = self._sim.habitat_config.DEPTH_SENSOR.WIDTH
-        hfov = float(self._sim.habitat_config.DEPTH_SENSOR.HFOV) * np.pi / 180
-        vfov = 2 * np.arctan((depth_H / depth_W) * np.tan(hfov / 2.0))
-        self.intrinsic_matrix = np.array(
-            [
-                [1 / np.tan(hfov / 2.0), 0.0, 0.0, 0.0],
-                [0.0, 1 / np.tan(vfov / 2.0), 0.0, 0.0],
-                [0.0, 0.0, 1, 0],
-                [0.0, 0.0, 0, 1],
-            ]
+        super().__init__(sim, config, *args, **kwargs)
+        self.max_voxel_height = int(360 / self.z_resolution)
+        self.min_voxel_height = int(100 / self.z_resolution)
+        self.min_mapped_height = int(
+            100 / self.z_resolution - self.min_voxel_height
         )
-        self.inverse_intrinsic_matrix = np.linalg.inv(self.intrinsic_matrix)
-
-        # Height thresholds for obstacles
-        self.height_thresh = self.config.HEIGHT_THRESH
-
-        # Depth processing
-        self.min_depth = float(self._sim.habitat_config.DEPTH_SENSOR.MIN_DEPTH)
-        self.max_depth = float(self._sim.habitat_config.DEPTH_SENSOR.MAX_DEPTH)
-
-        # Pre-compute a grid of locations for depth projection
-        W = self._sim.habitat_config.DEPTH_SENSOR.WIDTH
-        H = self._sim.habitat_config.DEPTH_SENSOR.HEIGHT
-        self.proj_xs, self.proj_ys = np.meshgrid(
-            np.linspace(-1, 1, W), np.linspace(1, -1, H)
-        )
-
-    def _get_uuid(self, *args: Any, **kwargs: Any):
-        return "ego_map_gt"
-
-    def _get_sensor_type(self, *args: Any, **kwargs: Any):
-        return SensorTypes.COLOR
-
-    def _get_observation_space(self, *args: Any, **kwargs: Any):
-        sensor_shape = (self.config.MAP_SIZE, self.config.MAP_SIZE, 2)
-        return spaces.Box(low=0, high=1, shape=sensor_shape, dtype=np.uint8,)
-
-    def convert_to_pointcloud(self, depth):
-        """
-        Inputs:
-            depth = (H, W, 1) numpy array
-
-        Returns:
-            xyz_camera = (N, 3) numpy array for (X, Y, Z) in egocentric world coordinates
-        """
-
-        depth_float = depth.astype(np.float32)[..., 0]
-
-        # =========== Convert to camera coordinates ============
-        W = depth.shape[1]
-        xs = np.copy(self.proj_xs).reshape(-1)
-        ys = np.copy(self.proj_ys).reshape(-1)
-        depth_float = depth_float.reshape(-1)
-        # Filter out invalid depths
-        valid_depths = (depth_float != self.min_depth) & (
-            depth_float <= self.max_forward_range
-        )
-        xs = xs[valid_depths]
-        ys = ys[valid_depths]
-        depth_float = depth_float[valid_depths]
-        # Unproject
-        # negate depth as the camera looks along -Z
-        xys = np.vstack(
-            (
-                xs * depth_float,
-                ys * depth_float,
-                -depth_float,
-                np.ones(depth_float.shape),
-            )
-        )
-        inv_K = self.inverse_intrinsic_matrix
-        xyz_camera = np.matmul(inv_K, xys).T  # XYZ in the camera coordinate system
-        xyz_camera = xyz_camera[:, :3] / xyz_camera[:, 3][:, np.newaxis]
-
-        return xyz_camera
-
-    def safe_assign(self, im_map, x_idx, y_idx, value):
-        try:
-            im_map[x_idx, y_idx] = value
-        except IndexError:
-            valid_idx1 = np.logical_and(x_idx >= 0, x_idx < im_map.shape[0])
-            valid_idx2 = np.logical_and(y_idx >= 0, y_idx < im_map.shape[1])
-            valid_idx = np.logical_and(valid_idx1, valid_idx2)
-            im_map[x_idx[valid_idx], y_idx[valid_idx]] = value
-
-    def _get_depth_projection(self, sim_depth):
-        """
-        Project pixels visible in depth-map to ground-plane
-        """
-
-        if self._sim.habitat_config.DEPTH_SENSOR.NORMALIZE_DEPTH:
-            depth = sim_depth * (self.max_depth - self.min_depth) + self.min_depth
-        else:
-            depth = sim_depth
-
-        XYZ_ego = self.convert_to_pointcloud(depth)
-
-        # Adding agent's height to the pointcloud
-        XYZ_ego[:, 1] += self.camera_height
-
-        # Convert to grid coordinate system
-        V = self.map_size
-        Vby2 = V // 2
-
-        points = XYZ_ego
-
-        grid_x = (points[:, 0] / self.map_scale) + Vby2
-        grid_y = (points[:, 2] / self.map_scale) + V
-
-        # Filter out invalid points
-        valid_idx = (
-            (grid_x >= 0) & (grid_x <= V - 1) & (grid_y >= 0) & (grid_y <= V - 1)
-        )
-        points = points[valid_idx, :]
-        grid_x = grid_x[valid_idx].astype(int)
-        grid_y = grid_y[valid_idx].astype(int)
-
-        # Create empty maps for the two channels
-        obstacle_mat = np.zeros((self.map_size, self.map_size), np.uint8)
-        explore_mat = np.zeros((self.map_size, self.map_size), np.uint8)
-
-        # Compute obstacle locations
-        high_filter_idx = points[:, 1] < self.height_thresh[1]
-        low_filter_idx = points[:, 1] > self.height_thresh[0]
-        obstacle_idx = np.logical_and(low_filter_idx, high_filter_idx)
-
-        self.safe_assign(obstacle_mat, grid_y[obstacle_idx], grid_x[obstacle_idx], 1)
-        kernel = np.ones((3, 3), np.uint8)
-        obstacle_mat = cv2.dilate(obstacle_mat, kernel, iterations=1)
-
-        # Compute explored locations
-        explored_idx = high_filter_idx
-        self.safe_assign(explore_mat, grid_y[explored_idx], grid_x[explored_idx], 1)
-        kernel = np.ones((3, 3), np.uint8)
-        obstacle_mat = cv2.dilate(obstacle_mat, kernel, iterations=1)
-
-        # Smoothen the maps
-        kernel = np.ones((3, 3), np.uint8)
-
-        obstacle_mat = cv2.morphologyEx(obstacle_mat, cv2.MORPH_CLOSE, kernel)
-        explore_mat = cv2.morphologyEx(explore_mat, cv2.MORPH_CLOSE, kernel)
-
-        # Ensure all expanded regions in obstacle_mat are accounted for in explored_mat
-        explore_mat = np.logical_or(explore_mat, obstacle_mat)
-
-        return np.stack([obstacle_mat, explore_mat], axis=2)
-
-    def get_observation(self, *args: Any, observations, episode, **kwargs: Any):
-        sim_depth = asnumpy(observations["depth"])
-        ego_map_gt = self._get_depth_projection(sim_depth)
-
-        return ego_map_gt
-
-
-@registry.register_sensor(name="GTEgoWallMap")
-class GTEgoWallMap(Sensor):
-    r"""Estimates the top-down wall occupancy based on current depth-map.
-
-    Args:
-        sim: reference to the simulator for calculating task observations.
-        config: contains the MAP_SCALE, MAP_SIZE, HEIGHT_THRESH fields to
-                decide grid-size, extents of the projection, and the thresholds
-                for determining obstacles and explored space.
-    """
-
-    def __init__(self, sim: Simulator, config: Config, *args: Any, **kwargs: Any):
-        self._sim = sim
-
-        super().__init__(config=config)
-
-        # Map statistics
-        self.map_size = self.config.MAP_SIZE
-        self.map_scale = self.config.MAP_SCALE
-        if self.config.MAX_SENSOR_RANGE > 0:
-            self.max_forward_range = self.config.MAX_SENSOR_RANGE
-        else:
-            self.max_forward_range = self.map_size * self.map_scale
-
-        # Agent height for pointcloud tranforms
-        self.camera_height = self._sim.habitat_config.DEPTH_SENSOR.POSITION[1]
-
-        # Compute intrinsic matrix
-        depth_H = self._sim.habitat_config.DEPTH_SENSOR.HEIGHT
-        depth_W = self._sim.habitat_config.DEPTH_SENSOR.WIDTH
-        hfov = float(self._sim.habitat_config.DEPTH_SENSOR.HFOV) * np.pi / 180
-        vfov = 2 * np.arctan((depth_H / depth_W) * np.tan(hfov / 2.0))
-        self.intrinsic_matrix = np.array(
-            [
-                [1 / np.tan(hfov / 2.0), 0.0, 0.0, 0.0],
-                [0.0, 1 / np.tan(vfov / 2.0), 0.0, 0.0],
-                [0.0, 0.0, 1, 0],
-                [0.0, 0.0, 0, 1],
-            ]
-        )
-        self.inverse_intrinsic_matrix = np.linalg.inv(self.intrinsic_matrix)
-
-        # Height thresholds for obstacles
-        self.height_thresh = self.config.HEIGHT_THRESH
-
-        # Depth processing
-        self.min_depth = float(self._sim.habitat_config.DEPTH_SENSOR.MIN_DEPTH)
-        self.max_depth = float(self._sim.habitat_config.DEPTH_SENSOR.MAX_DEPTH)
-
-        # Pre-compute a grid of locations for depth projection
-        W = self._sim.habitat_config.DEPTH_SENSOR.WIDTH
-        H = self._sim.habitat_config.DEPTH_SENSOR.HEIGHT
-        self.proj_xs, self.proj_ys = np.meshgrid(
-            np.linspace(-1, 1, W), np.linspace(1, -1, H)
+        self.max_mapped_height = int(
+            (self.agent_height + 1) / self.z_resolution - self.min_voxel_height
         )
 
     def _get_uuid(self, *args: Any, **kwargs: Any):
         return "ego_wall_map_gt"
-
-    def _get_sensor_type(self, *args: Any, **kwargs: Any):
-        return SensorTypes.COLOR
-
-    def _get_observation_space(self, *args: Any, **kwargs: Any):
-        sensor_shape = (self.config.MAP_SIZE, self.config.MAP_SIZE, 2)
-        return spaces.Box(low=0, high=1, shape=sensor_shape, dtype=np.uint8,)
-
-    def convert_to_pointcloud(self, depth):
-        """
-        Inputs:
-            depth = (H, W, 1) numpy array
-
-        Returns:
-            xyz_camera = (N, 3) numpy array for (X, Y, Z) in egocentric world coordinates
-        """
-
-        depth_float = depth.astype(np.float32)[..., 0]
-
-        # =========== Convert to camera coordinates ============
-        W = depth.shape[1]
-        xs = np.copy(self.proj_xs).reshape(-1)
-        ys = np.copy(self.proj_ys).reshape(-1)
-        depth_float = depth_float.reshape(-1)
-        # Filter out invalid depths
-        valid_depths = (depth_float != 0.0) & (depth_float <= self.max_forward_range)
-        xs = xs[valid_depths]
-        ys = ys[valid_depths]
-        depth_float = depth_float[valid_depths]
-        # Unproject
-        # negate depth as the camera looks along -Z
-        xys = np.vstack(
-            (
-                xs * depth_float,
-                ys * depth_float,
-                -depth_float,
-                np.ones(depth_float.shape),
-            )
-        )
-        inv_K = self.inverse_intrinsic_matrix
-        xyz_camera = np.matmul(inv_K, xys).T  # XYZ in the camera coordinate system
-        xyz_camera = xyz_camera[:, :3] / xyz_camera[:, 3][:, np.newaxis]
-
-        return xyz_camera
-
-    def safe_assign(self, im_map, x_idx, y_idx, value):
-        try:
-            im_map[x_idx, y_idx] = value
-        except IndexError:
-            valid_idx1 = np.logical_and(x_idx >= 0, x_idx < im_map.shape[0])
-            valid_idx2 = np.logical_and(y_idx >= 0, y_idx < im_map.shape[1])
-            valid_idx = np.logical_and(valid_idx1, valid_idx2)
-            im_map[x_idx[valid_idx], y_idx[valid_idx]] = value
-
-    def _get_depth_projection(self, sim_depth):
-        """
-        Project pixels visible in depth-map to ground-plane
-        """
-
-        if self._sim.habitat_config.DEPTH_SENSOR.NORMALIZE_DEPTH:
-            depth = sim_depth * (self.max_depth - self.min_depth) + self.min_depth
-        else:
-            depth = sim_depth
-
-        XYZ_ego = self.convert_to_pointcloud(depth)
-
-        # Adding agent's height to the pointcloud
-        XYZ_ego[:, 1] += self.camera_height
-
-        # Convert to grid coordinate system
-        V = self.map_size
-        Vby2 = V // 2
-
-        points = XYZ_ego
-
-        grid_x = (points[:, 0] / self.map_scale) + Vby2
-        grid_y = (points[:, 2] / self.map_scale) + V
-
-        # Filter out invalid points
-        valid_idx = (
-            (grid_x >= 0) & (grid_x <= V - 1) & (grid_y >= 0) & (grid_y <= V - 1)
-        )
-        points = points[valid_idx, :]
-        grid_x = grid_x[valid_idx].astype(int)
-        grid_y = grid_y[valid_idx].astype(int)
-
-        # Create empty maps for the wall obstacle channel
-        obstacle_mat = np.zeros((self.map_size, self.map_size), np.uint8)
-
-        # Compute wall obstacle locations
-        high_filter_idx = points[:, 1] < self.height_thresh[1]
-        low_filter_idx = points[:, 1] > self.height_thresh[0]
-        obstacle_idx = np.logical_and(low_filter_idx, high_filter_idx)
-
-        self.safe_assign(obstacle_mat, grid_y[obstacle_idx], grid_x[obstacle_idx], 1)
-        kernel = np.ones((3, 3), np.uint8)
-        obstacle_mat = cv2.dilate(obstacle_mat, kernel, iterations=1)
-
-        # Smoothen the maps
-        kernel = np.ones((3, 3), np.uint8)
-
-        obstacle_mat = cv2.morphologyEx(obstacle_mat, cv2.MORPH_CLOSE, kernel)
-
-        return np.stack([obstacle_mat, obstacle_mat], axis=2)
-
-    def get_observation(self, *args: Any, observations, episode, **kwargs: Any):
-        sim_depth = asnumpy(observations["depth"])
-        ego_wall_map_gt = self._get_depth_projection(sim_depth)
-
-        return ego_wall_map_gt
 
 
 @registry.register_sensor(name="GTEgoMapAnticipated")
@@ -854,10 +527,9 @@ class GTEgoMapAnticipated(GTEgoMap):
     """
 
     def __init__(self, sim: Simulator, config: Config, *args: Any, **kwargs: Any):
-        self._sim = sim
-
-        super().__init__(sim, config=config)
-
+        super().__init__(sim, config=config, *args, **kwargs)
+        self.map_scale = config.MAP_SCALE
+        self.map_size = config.MAP_SIZE
         self._num_samples = config.NUM_TOPDOWN_MAP_SAMPLE_POINTS
         self._coordinate_min = maps.COORDINATE_MIN
         self._coordinate_max = maps.COORDINATE_MAX
@@ -1117,8 +789,15 @@ class GTEgoMapAnticipated(GTEgoMap):
 
         return ego_map
 
-    def _get_grown_depth_projection(self, episode, agent_state, sim_depth):
-        projected_occupancy = self._get_depth_projection(sim_depth)
+    def _get_grown_depth_projection(self, episode, agent_state, sim_depth, sim_rgb):
+        # Get projected occupancy
+        sim_depth = asnumpy(sim_depth)  # (H, W, 1)
+        sim_rgb = asnumpy(sim_rgb)  # (H, W, 3)
+        sim_depth = torch.from_numpy(sim_depth).squeeze(2).unsqueeze(0)  # (1, H, W)
+        sim_rgb = torch.from_numpy(sim_rgb).permute(2, 0, 1).unsqueeze(0)  # (1, 3, H, W)
+        projected_occupancy = self._get_depth_projection(sim_rgb, sim_depth)
+        projected_occupancy = asnumpy(rearrange(projected_occupancy, "() c h w -> h w c"))
+        # Get mesh occupancy
         mesh_occupancy = self._get_mesh_occupancy(episode, agent_state)
         grown_map = grow_projected_map(
             projected_occupancy, mesh_occupancy, self._region_growing_iterations,
@@ -1129,13 +808,19 @@ class GTEgoMapAnticipated(GTEgoMap):
         agent_state = self._sim.get_agent_state()
         if self.config.GT_TYPE == "grown_occupancy":
             sim_depth = observations["depth"]
+            sim_rgb = observations["rgb"]
             ego_map_gt_anticipated = self._get_grown_depth_projection(
-                episode, agent_state, sim_depth,
+                episode, agent_state, sim_depth, sim_rgb
             )
         elif self.config.GT_TYPE == "full_occupancy":
             ego_map_gt_anticipated = self._get_mesh_occupancy(episode, agent_state,)
         elif self.config.GT_TYPE == "wall_occupancy":
+            sim_rgb = observations["rgb"]
             sim_depth = observations["depth"]
+            sim_depth = asnumpy(sim_depth)  # (H, W, 1)
+            sim_rgb = asnumpy(sim_rgb)  # (H, W, 3)
+            sim_depth = torch.from_numpy(sim_depth).squeeze(2).unsqueeze(0)  # (1, H, W)
+            sim_rgb = torch.from_numpy(sim_rgb).permute(2, 0, 1).unsqueeze(0)  # (1, 3, H, W)
             full_occupancy = self._get_mesh_occupancy(episode, agent_state,)
             wall_occupancy = self._get_wall_occupancy(episode, agent_state,)
 
@@ -1157,7 +842,8 @@ class GTEgoMapAnticipated(GTEgoMap):
             ).T
 
             # Add the GT ego map to this
-            ego_map_gt = self._get_depth_projection(sim_depth)
+            ego_map_gt = self._get_depth_projection(sim_rgb, sim_depth)
+            ego_map_gt = asnumpy(rearrange(ego_map_gt, "() c h w -> h w c"))
             current_mask = np.maximum(current_mask, ego_map_gt[..., 1])
 
             dilation_mask = np.ones((5, 5))
