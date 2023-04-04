@@ -347,7 +347,7 @@ class GTEgoMap(Sensor):
         self.max_mapped_height = int(
             (self.agent_height + 1) / self.z_resolution - self.min_voxel_height
         )
-        self.du_scale = 1
+        self.du_scale = 4
         self.shift_loc = [self.vision_range * self.xy_resolution // 2, 0, np.pi / 2.0]
         self.tilt_angle = self._sim.habitat_config.DEPTH_SENSOR.ORIENTATION[0]  # in radians
 
@@ -355,6 +355,8 @@ class GTEgoMap(Sensor):
         self.src_min_depth = float(self._sim.habitat_config.DEPTH_SENSOR.MIN_DEPTH) * 100.0
         self.src_max_depth = float(self._sim.habitat_config.DEPTH_SENSOR.MAX_DEPTH) * 100.0
         self.src_normalized_depth = self._sim.habitat_config.DEPTH_SENSOR.NORMALIZE_DEPTH
+        device_id = self._sim.config.sim_cfg.gpu_device_id
+        self.device = torch.device("cuda:{}".format(device_id) if torch.cuda.is_available() else "cpu")
 
     def _get_uuid(self, *args: Any, **kwargs: Any):
         return "ego_map_gt"
@@ -391,7 +393,7 @@ class GTEgoMap(Sensor):
             depth, self.camera_matrix, device, scale=self.du_scale
         )
         point_cloud_base_coords = du.transform_camera_view_t(
-            point_cloud_t, self.agent_height, (tilt * 180.0 / math.pi).numpy(), device
+            point_cloud_t, self.agent_height, asnumpy(tilt * 180.0 / math.pi), device
         )
         point_cloud_map_coords = du.transform_pose_t(
             point_cloud_base_coords, self.shift_loc, device
@@ -482,6 +484,8 @@ class GTEgoMap(Sensor):
         sim_rgb = asnumpy(observations["rgb"])  # (H, W, 3)
         sim_depth = torch.from_numpy(sim_depth).squeeze(2).unsqueeze(0)  # (1, H, W)
         sim_rgb = torch.from_numpy(sim_rgb).permute(2, 0, 1).unsqueeze(0)  # (1, 3, H, W)
+        sim_depth = sim_depth.to(self.device)
+        sim_rgb = sim_rgb.to(self.device)
         ego_map_gt = self._get_depth_projection(sim_rgb, sim_depth)  # (1, 2, H, W)
         ego_map_gt = asnumpy(rearrange(ego_map_gt, "() c h w -> h w c"))
 
@@ -795,6 +799,8 @@ class GTEgoMapAnticipated(GTEgoMap):
         sim_rgb = asnumpy(sim_rgb)  # (H, W, 3)
         sim_depth = torch.from_numpy(sim_depth).squeeze(2).unsqueeze(0)  # (1, H, W)
         sim_rgb = torch.from_numpy(sim_rgb).permute(2, 0, 1).unsqueeze(0)  # (1, 3, H, W)
+        sim_depth = sim_depth.to(self.device)
+        sim_rgb = sim_rgb.to(self.device)
         projected_occupancy = self._get_depth_projection(sim_rgb, sim_depth)
         projected_occupancy = asnumpy(rearrange(projected_occupancy, "() c h w -> h w c"))
         # Get mesh occupancy
@@ -821,6 +827,8 @@ class GTEgoMapAnticipated(GTEgoMap):
             sim_rgb = asnumpy(sim_rgb)  # (H, W, 3)
             sim_depth = torch.from_numpy(sim_depth).squeeze(2).unsqueeze(0)  # (1, H, W)
             sim_rgb = torch.from_numpy(sim_rgb).permute(2, 0, 1).unsqueeze(0)  # (1, 3, H, W)
+            sim_depth = sim_depth.to(self.device)
+            sim_rgb = sim_rgb.to(self.device)
             full_occupancy = self._get_mesh_occupancy(episode, agent_state,)
             wall_occupancy = self._get_wall_occupancy(episode, agent_state,)
 
