@@ -93,9 +93,8 @@ To compute the occupancy ground-truth, we cast rays from the agent's position ti
 # Gibson splits
 
 # Need to set this to train / val
-SPLIT="train"
 cd $OCCANT_ROOT_DIR
-python occant_baselines/generate_topdown_maps/generate_occant_gt_maps.py \
+SPLIT="train" && python occant_baselines/generate_topdown_maps/generate_occant_gt_maps.py \
     --config-path occant_baselines/generate_topdown_maps/configs/occant_gt/gibson_${SPLIT}.yaml \
     --save-dir data/datasets/exploration/gibson/v1/${SPLIT}/occant_gt_maps \
     --global-map-size 961
@@ -104,9 +103,8 @@ python occant_baselines/generate_topdown_maps/generate_occant_gt_maps.py \
 # Matterport3D splits
 
 # Need to set this to train / val / test
-SPLIT="train"
 cd $OCCANT_ROOT_DIR
-python occant_baselines/generate_topdown_maps/generate_occant_gt_maps.py \
+SPLIT="train" && python occant_baselines/generate_topdown_maps/generate_occant_gt_maps.py \
     --config-path occant_baselines/generate_topdown_maps/configs/occant_gt/mp3d_${SPLIT}.yaml \
     --save-dir data/datasets/exploration/mp3d/v1/${SPLIT}/occant_gt_maps \
     --global-map-size 2001

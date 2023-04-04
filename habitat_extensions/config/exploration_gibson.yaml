@@ -40,9 +40,7 @@ TASK:
     MAP_SCALE: 0.05
     MAX_SENSOR_RANGE: 5.05
     HEIGHT_THRESH: [0.2, 1.5]
-    GT_TYPE: "wall_occupancy"
-    ALL_MAPS_INFO_PATH: "data/datasets/exploration/gibson/v1/val/occant_gt_maps/all_maps_info.json"
-    WALL_FOV: 90.0
+    GT_TYPE: "grown_occupancy"
   MEASUREMENTS: ['TOP_DOWN_MAP_EXP', 'GT_GLOBAL_MAP']
 DATASET:
   TYPE: Exploration-v1
