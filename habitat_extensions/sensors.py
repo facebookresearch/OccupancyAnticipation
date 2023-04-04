@@ -322,10 +322,8 @@ class GTEgoMap(Sensor):
     """
 
     def __init__(self, sim: Simulator, config: Config, *args: Any, **kwargs: Any):
-        self._sim = sim
-
         super().__init__(config=config)
-
+        self._sim = sim
         self.screen_h = self._sim.habitat_config.DEPTH_SENSOR.HEIGHT
         self.screen_w = self._sim.habitat_config.DEPTH_SENSOR.WIDTH
         self.camera_matrix = du.get_camera_matrix(
@@ -485,7 +483,7 @@ class GTEgoMap(Sensor):
         sim_depth = torch.from_numpy(sim_depth).squeeze(2).unsqueeze(0)  # (1, H, W)
         sim_rgb = torch.from_numpy(sim_rgb).permute(2, 0, 1).unsqueeze(0)  # (1, 3, H, W)
         ego_map_gt = self._get_depth_projection(sim_rgb, sim_depth)  # (1, 2, H, W)
-        ego_map_gt = rearrange(ego_map_gt, "() c h w -> h w c")
+        ego_map_gt = asnumpy(rearrange(ego_map_gt, "() c h w -> h w c"))
 
         return ego_map_gt
 

@@ -104,6 +104,9 @@ while True:
     vis_image_bot = np.concatenate(
         [ego_map, ego_map_anticipated, gt_global_map], axis=1
     )
+    new_W = vis_image_top.shape[1]
+    new_H = int(vis_image_top.shape[1] / vis_image_bot.shape[1] * vis_image_bot.shape[0])
+    vis_image_bot = cv2.resize(vis_image_bot, (new_W, new_H), interpolation=cv2.INTER_AREA)
     vis_image = np.concatenate([vis_image_top, vis_image_bot], axis=0)
 
     cv2.imshow("Image", np.flip(vis_image, axis=2))
