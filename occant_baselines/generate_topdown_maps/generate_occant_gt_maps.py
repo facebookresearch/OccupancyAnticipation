@@ -263,7 +263,6 @@ def main(args):
 
         _ = env.reset()
 
-        episode_id = env.habitat_env.current_episode.episode_id
         scene_id = env.habitat_env.current_episode.scene_id.split("/")[-1]
         agent_state = env.habitat_env.sim.get_agent_state()
         start_position = np.array(agent_state.position)

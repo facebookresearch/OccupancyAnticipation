@@ -18,6 +18,8 @@ from occant_baselines.models.unet import (
     ResNetRGBEncoder,
 )
 
+from einops import rearrange
+
 
 def softmax_2d(x):
     b, h, w = x.shape
@@ -37,7 +39,7 @@ class BaseModel(nn.Module):
         if cfg.GP_ANTICIPATION.OUTPUT_NORMALIZATION.channel_0 == "sigmoid":
             self.normalize_channel_0 = torch.sigmoid
         elif cfg.GP_ANTICIPATION.OUTPUT_NORMALIZATION.channel_0 == "softmax":
-            self.normalize_channel_0 = softmax_0d
+            self.normalize_channel_0 = softmax_2d
 
         if cfg.GP_ANTICIPATION.OUTPUT_NORMALIZATION.channel_1 == "sigmoid":
             self.normalize_channel_1 = torch.sigmoid

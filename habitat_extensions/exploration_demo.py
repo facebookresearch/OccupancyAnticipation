@@ -86,7 +86,7 @@ Action space:
 
 action = 0
 count = 0
-H, W = 100, 100
+H, W = 300, 300
 while True:
     obs, reward, done, info = env.step(action)
     if done:
