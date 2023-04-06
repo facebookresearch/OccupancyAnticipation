@@ -64,6 +64,9 @@ from occant_baselines.models.occant import OccupancyAnticipator
 from einops import rearrange, asnumpy
 
 
+torch.set_num_threads(1)
+
+
 @baseline_registry.register_trainer(name="occant_exp")
 class OccAntExpTrainer(BaseRLTrainer):
     r"""Trainer class for Occupancy Anticipated based exploration algorithm.
@@ -186,14 +189,16 @@ class OccAntExpTrainer(BaseRLTrainer):
         self.local_actor_critic = self.ans_net.local_policy
         self.global_actor_critic = self.ans_net.global_policy
         # Create depth projection model to estimate visible occupancy
-        self.depth_projection_net = DepthProjectionNet(
-            ans_cfg.OCCUPANCY_ANTICIPATOR.EGO_PROJECTION
-        )
+        if 'GT_EGO_MAP' not in self.config.TASK_CONFIG.TASK.SENSORS:
+            self.depth_projection_net = DepthProjectionNet(
+                ans_cfg.OCCUPANCY_ANTICIPATOR.EGO_PROJECTION
+            )
         # Set to device
         self.mapper.to(self.device)
         self.local_actor_critic.to(self.device)
         self.global_actor_critic.to(self.device)
-        self.depth_projection_net.to(self.device)
+        if 'GT_EGO_MAP' not in self.config.TASK_CONFIG.TASK.SENSORS:
+            self.depth_projection_net.to(self.device)
         # ============================== Create agents ================================
         # Mapper agent
         self.mapper_agent = MapUpdate(
@@ -907,10 +912,11 @@ class OccAntExpTrainer(BaseRLTrainer):
             depth = F.interpolate(depth, (imH, imW), mode="nearest")
             batch["depth"] = rearrange(depth, "b c h w -> b h w c")
         # Compute ego_map_gt from depth
-        ego_map_gt_b = self.depth_projection_net(
-            rearrange(batch["depth"], "b h w c -> b c h w")
-        )
-        batch["ego_map_gt"] = rearrange(ego_map_gt_b, "b c h w -> b h w c")
+        if 'GT_EGO_MAP' not in self.config.TASK_CONFIG.TASK.SENSORS:
+            ego_map_gt_b = self.depth_projection_net(
+                rearrange(batch["depth"], "b h w c -> b c h w")
+            )
+            batch["ego_map_gt"] = rearrange(ego_map_gt_b, "b c h w -> b h w c")
         if actions is None:
             # Initialization condition
             # If pose estimates are not available, set the initial estimate to zeros.
@@ -1666,10 +1672,16 @@ class OccAntExpTrainer(BaseRLTrainer):
                                 observations[i], infos[i], observation_size=300
                             )
                             # Add ego_map_gt to frame
-                            ego_map_gt_i = asnumpy(batch["ego_map_gt"][i])  # (2, H, W)
+                            ego_map_gt_i = asnumpy(batch["ego_map_gt"][i])  # (H, W, 2)
                             ego_map_gt_i = convert_gt2channel_to_gtrgb(ego_map_gt_i)
                             ego_map_gt_i = cv2.resize(ego_map_gt_i, (300, 300))
-                            frame = np.concatenate([frame, ego_map_gt_i], axis=1)
+                            ego_map_a_i = asnumpy(
+                                mapper_outputs["all_pu_outputs"]["occ_estimate"][i]
+                            ) # (2, H, W)
+                            ego_map_a_i = rearrange(ego_map_a_i, "c h w -> h w c")
+                            ego_map_a_i = convert_gt2channel_to_gtrgb(ego_map_a_i)
+                            ego_map_a_i = cv2.resize(ego_map_a_i, (300, 300))
+                            frame = np.concatenate([frame, ego_map_gt_i, ego_map_a_i], axis=1)
                             # Generate ANS specific visualizations
                             environment_layout = asnumpy(
                                 ground_truth_states["environment_layout"][i]
@@ -1747,6 +1759,9 @@ class OccAntExpTrainer(BaseRLTrainer):
                                 ],
                                 axis=1,
                             )
+                            new_W = frame.shape[1]
+                            new_H = int(frame.shape[1] / maps_vis.shape[1] * maps_vis.shape[0])
+                            maps_vis = cv2.resize(maps_vis, (new_W, new_H), interpolation=cv2.INTER_AREA)
                             frame = np.concatenate([frame, maps_vis], axis=0)
 
                             rgb_frames[i].append(frame)
