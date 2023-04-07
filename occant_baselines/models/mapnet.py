@@ -286,10 +286,10 @@ class DepthProjectionNet(MapNet):
         x_gp_free = self._ground_projection(
             free_mask, spatial_locs, valid_inputs
         )  # (bs, 1, s, s)
-        # Dilate obstacles in x_gp
-        x_gp_obstacles = dilate_tensor(x_gp_obstacles, 3, iterations=2)
-        # Dilate free space in x_gp
-        x_gp_free = dilate_tensor(x_gp_free, 5, iterations=2)
+        # # Dilate obstacles in x_gp
+        # x_gp_obstacles = dilate_tensor(x_gp_obstacles, 3, iterations=2)
+        # # Dilate free space in x_gp
+        # x_gp_free = dilate_tensor(x_gp_free, 5, iterations=2)
         # Compute explored space from free space and obstacles
         x_gp_explored = torch.max(x_gp_free, x_gp_obstacles)
         x_gp = torch.cat([x_gp_obstacles, x_gp_explored], dim=1)
