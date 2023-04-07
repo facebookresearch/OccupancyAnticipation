@@ -114,6 +114,8 @@ class OccAntExpTrainer(BaseRLTrainer):
         hfov_rad = np.radians(float(hfov))
         vfov_rad = 2 * np.arctan((height / width) * np.tan(hfov_rad / 2.0))
         vfov = np.degrees(vfov_rad).item()
+        tilt_rad = config.TASK_CONFIG.SIMULATOR.DEPTH_SENSOR.ORIENTATION[0]
+        tilt = np.degrees(tilt_rad).item()
         camera_height = config.TASK_CONFIG.SIMULATOR.DEPTH_SENSOR.POSITION[1]
         height_thresholds = [0.2, 1.5]
         # Set the EGO_PROJECTION options
@@ -124,6 +126,7 @@ class OccAntExpTrainer(BaseRLTrainer):
         ego_proj_config.max_depth = max_depth
         ego_proj_config.hfov = hfov
         ego_proj_config.vfov = vfov
+        ego_proj_config.tilt = tilt
         ego_proj_config.camera_height = camera_height
         ego_proj_config.height_thresholds = height_thresholds
         config.RL.ANS.OCCUPANCY_ANTICIPATOR.EGO_PROJECTION = ego_proj_config

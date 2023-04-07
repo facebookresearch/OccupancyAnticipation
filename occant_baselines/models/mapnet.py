@@ -98,16 +98,17 @@ def compute_spatial_locs(
         depth_inputs  - (bs, 1, imh, imw) depth values per pixel in `units`.
         local_shape   - (s, s) tuple of ground projection size
         local_scale   - cell size of ground projection in `units`
-        camera_params - (fx, fy, cx, cy) tuple
+        camera_params - (fx, fy, cx, cy, tilt) tuple
     Outputs:
         spatial_locs  - (bs, 2, imh, imw) x,y locations of projection per pixel
         valid_inputs  - (bs, 1, imh, imw) ByteTensor (all locations where
                         depth measurements are available)
 
+    Conventions for tilt: downward tilt is negative, zero tilt is forward
     Conventions for the map: The agent is standing at the bottom center of the map and facing upward
     in the egocentric coordinate.
     """
-    fx, fy, cx, cy = camera_params
+    fx, fy, cx, cy, tilt = camera_params
     bs, _, imh, imw = depth_inputs.shape
     s = local_shape[1]
     device = depth_inputs.device
@@ -123,6 +124,13 @@ def compute_spatial_locs(
     Z = depth_inputs
     X = xx * Z
     Y = yy * Z
+
+    # Account for tilt-angle
+    Z_ = Z * math.cos(tilt) - Y * math.sin(tilt)
+    Y_ = Y * math.cos(tilt) + Z * math.sin(tilt)
+    Z = Z_
+    Y = Y_
+
     valid_inputs = depth_inputs != min_depth
     if truncate_depth > 0:
         valid_inputs = valid_inputs & (depth_inputs <= truncate_depth)
@@ -153,6 +161,7 @@ class MapNet(nn.Module):
         # Camera params for depth projection
         self.hfov = math.radians(cfg.hfov)
         self.vfov = math.radians(cfg.vfov)
+        self.tilt = math.radians(cfg.tilt)
 
     def forward(self, img_feats, depth):
         """
@@ -207,7 +216,7 @@ class MapNet(nn.Module):
             valid_inputs - (bs, 1, imh, imw) ByteTensor (all locations where
                            depth measurements are available)
         """
-        camera_params = (self.fx, self.fy, self.cx, self.cy)
+        camera_params = (self.fx, self.fy, self.cx, self.cy, self.tilt)
         local_scale = self.map_scale
         local_shape = self._local_map_shape[1:]
         outputs = compute_spatial_locs(

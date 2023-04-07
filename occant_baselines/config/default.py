@@ -186,6 +186,8 @@ _C.RL.ANS.OCCUPANCY_ANTICIPATOR.EGO_PROJECTION.truncate_depth = 3.25
 _C.RL.ANS.OCCUPANCY_ANTICIPATOR.EGO_PROJECTION.hfov = 90
 # Field of view of expanded image height (no expansion in height)
 _C.RL.ANS.OCCUPANCY_ANTICIPATOR.EGO_PROJECTION.vfov = 90
+# Tilt angle of the camera (in degrees) --- upward tilt is positive, zero tilt is forward
+_C.RL.ANS.OCCUPANCY_ANTICIPATOR.EGO_PROJECTION.tilt = 0
 # Camera height (in meters)
 _C.RL.ANS.OCCUPANCY_ANTICIPATOR.EGO_PROJECTION.camera_height = 1.25
 # Height thresholds to determine obstacles, free-space (in meters)
